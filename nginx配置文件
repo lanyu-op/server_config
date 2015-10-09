@@ -1,0 +1,290 @@
+
+user  root;
+
+worker_processes 8;
+worker_rlimit_nofile 204800;
+worker_cpu_affinity 00000001 00000010 00000100 00001000 00010000 00100000 01000000 10000000;
+
+
+#error_log   /www/log/nginx_error.log   crit;
+#error_log  logs/error.log;
+#error_log  logs/error.log  notice;
+#error_log  logs/error.log  info;
+
+#pid        logs/nginx.pid;
+
+
+events {
+    use epoll;
+    worker_connections  102400;
+}
+
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    charset utf-8;
+    #set_real_ip_from 10.0.0.0/8;
+    set_real_ip_from 112.74.95.143;
+    set_real_ip_from 127.0.0.1;
+    real_ip_header X-Forwarded-For;
+    #log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+    #                  '$status $body_bytes_sent "$http_referer" '
+    #                  '"$http_user_agent" "$http_x_forwarded_for"';
+
+    #access_log  logs/access.log  main;
+
+        log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                                        '"$status" $body_bytes_sent "$http_referer" '
+                                        '"$http_user_agent" "$http_x_forwarded_for" '
+                                        '"$gzip_ratio" $request_time $bytes_sent $request_length';
+ 
+        log_format srcache_log '$remote_addr - $remote_user [$time_local] "$request" '
+                                '"$status" $body_bytes_sent $request_time $bytes_sent $request_length '
+                                '[$upstream_response_time] [$srcache_fetch_status] [$srcache_store_status] [$srcache_expire]';
+ 
+ 
+
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    #keepalive_timeout  0;
+    #keepalive_timeout  65;
+
+    #gzip  on;
+
+keepalive_timeout 60;
+server_names_hash_bucket_size 128;
+client_header_buffer_size 2k;
+large_client_header_buffers 4 4k;
+client_max_body_size 8m;
+
+
+
+
+   fastcgi_cache_path /usr/local/nginx/fastcgi_cache levels=1:2 keys_zone=TESTA:30m inactive=1d max_size=12g;
+
+
+   open_file_cache max=204800 inactive=20s;
+   open_file_cache_min_uses 1;
+   open_file_cache_valid 30s;  
+
+   tcp_nodelay on;
+
+   gzip on;
+   gzip_min_length   1k;
+   gzip_buffers     4 16k;
+   gzip_http_version 1.0;
+   gzip_comp_level 2;
+   gzip_types       text/plain application/x-javascript text/css application/xml;
+   gzip_vary on;
+	
+	upstream redis {
+	        server 127.0.0.1:6379;
+	        keepalive 512;
+	}
+   server {
+	listen   81;
+	server_name www.haoweihai.cn;
+	#access_log  /opt/webroot/net.access.log;
+	error_log  /opt/webroot/net.error.log;	
+
+	root /opt/webroot;
+	if ( $http_user_agent ~ "(MIDP)|(WAP)|(UP.Browser)|(Smartphone)|(Obigo)|(Mobile)|(AU.Browser)|(wxd.Mms)|(WxdB.Browser)|(CLDC)|(UP.Link)|(KM.Browser)|(UCWEB)|(SEMC\-Browser)|(Mini)|(Symbian)|(Palm)|(Nokia)|(Panasonic)|(MOT\-)|(SonyEricsson)|(NEC\-)|(Alcatel)|(Ericsson)|(BENQ)|(BenQ)|(Amoisonic)|(Amoi\-)|(Capitel)|(PHILIPS)|(SAMSUNG)|(Lenovo)|(Mitsu)|(Motorola)|(SHARP)|(WAPPER)|(LG\-)|(LG/)|(EG900)|(CECT)|(Compal)|(kejian)|(Bird)|(BIRD)|(G900/V1.0)|(Arima)|(CTL)|(TDG)|(Daxian)|(DAXIAN)|(DBTEL)|(Eastcom)|(EASTCOM)|(PANTECH)|(Dopod)|(Haier)|(HAIER)|(KONKA)|(KEJIAN)|(LENOVO)|(Soutec)|(SOUTEC)|(SAGEM)|(SEC\-)|(SED\-)|(EMOL\-)|(INNO55)|(ZTE)|(iPhone)|(Android)|(Windows CE)|(Wget)|(Java)|(curl)|(Opera)" )
+	{
+	rewrite ^/$ /mobile redirect;
+	}
+	
+	index  index.html index.htm index.php;
+
+	rewrite ^/mobile$ /mobile/Mobile/Index redirect;
+	rewrite ^/manage$ /manage/Manage/Index redirect;
+	rewrite ^/supplier$ /supplier/Supplier/Index redirect;
+	rewrite ^/install$ /install/Install/Index redirect;
+
+	location /protected {
+		deny all;
+	}
+
+	location /console {
+		deny all;
+	}
+
+	location /mobile {		
+		try_files $uri /mobile/index.php$is_args$args;
+ 	}
+	
+	location /manage {		
+		try_files $uri /manage/index.php$is_args$args;
+ 	}	
+			
+	location /supplier {		
+		try_files $uri /supplier/index.php$is_args$args;
+ 	}		
+			
+	location /install {		
+		try_files $uri /install/index.php$is_args$args;
+ 	}
+	
+	location / {		
+		try_files $uri /index.php$is_args$args;
+ 	}	
+
+	## deny all php file in /data or asset dir for security consideration
+	location ~ ^(/data|/asset|/mobile/asset|/manage/asset|/supplier/asset)(.+)\.php$ {
+		deny all;
+	}
+
+	## run only index.php for security consideration
+	location ~ ^(/index.php|/mobile/index.php|/manage/index.php|/supplier/index.php|/install/index.php)$ {
+			fastcgi_pass   127.0.0.1:9000;
+			fastcgi_index  index.php;
+			fastcgi_param  SCRIPT_FILENAME  /opt/webroot/$fastcgi_script_name;  
+			include fastcgi_params;
+
+   #fastcgi_connect_timeout 300;
+   #fastcgi_send_timeout 300;
+   #fastcgi_read_timeout 300;
+   #fastcgi_buffer_size 64k;
+   #fastcgi_buffers 4 64k;
+   #fastcgi_busy_buffers_size 128k;
+   #fastcgi_temp_file_write_size 128k;
+
+   #fastcgi_temp_path /usr/local/nginx/fastcgi_temp;
+
+   
+   #fastcgi_cache_methods GET HEAD;
+
+   #fastcgi_cache TESTA;
+   #fastcgi_cache_valid 200 302 304 1h;
+   #fastcgi_cache_min_uses 1;
+   #fastcgi_cache_use_stale error timeout invalid_header http_500;  
+   #fastcgi_cache_key "$request_method://$host$request_uri";
+   #fastcgi_cache_key $host$request_uri;
+   #include fastcgi.conf;
+
+
+	}
+
+    ## bzfshop has a perfect asset/resouce manage policy, it would change url if asset/resouce update
+	## so there is no need to refresh any resource file in bzfshop, set cache forever,
+	location ~ .*\.(gif|jpe?g|png|bmp|swf|js|css|ico)(\?.*)?$
+   	{
+		expires  max;
+   	} 	
+
+}
+
+    # another virtual host using mix of IP-, name-, and port-based configuration
+    #
+    server {
+        listen       81;
+        server_name www.360lzy.com;
+		include /home/webroot/sms/.htaccess;
+		include /home/webroot/sms/user/.htaccess;
+		root /home/webroot/;
+        location / {
+   
+	    
+            index  index.html index.htm index.php;
+            #try_files $uri $uri/ @rewrite;
+             #if (!-f $request_filename){
+             #    rewrite (.*) /index.php;
+            # }
+        }
+        location ~ \.php$ {
+                srcache_store_private on;
+                srcache_methods GET;
+                srcache_response_cache_control off;
+ 
+
+                if ( $uri ~ /markethelper/){
+                        set $key $request_uri;
+                        set_escape_uri $escaped_key $key;
+                        srcache_fetch GET /redis $key;
+                        srcache_default_expire 172800;
+                        srcache_store PUT /redis2 key=$escaped_key&exptime=$srcache_expire;
+ 
+                        add_header X-Cached-From $srcache_fetch_status;
+                        add_header X-Cached-Store $srcache_store_status;
+                        add_header X-Key $key;
+			set_md5 $md5key $key;
+			add_header X-md5-key $md5key;
+                        add_header X-Query_String $query_string;
+                        add_header X-expire $srcache_expire;
+ 
+		access_log /data/httplogs/360lzy.markethelper.log srcache_log;
+                }            
+            
+                include fastcgi_params;
+                fastcgi_pass  127.0.0.1:9000;
+                fastcgi_index index.php;
+                fastcgi_connect_timeout 60;
+                fastcgi_send_timeout 180;
+                fastcgi_read_timeout 180;
+                fastcgi_buffer_size 128k;
+                fastcgi_buffers 4 256k;
+                fastcgi_busy_buffers_size 256k;
+                fastcgi_temp_file_write_size 256k;
+                fastcgi_intercept_errors on;
+                fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
+                fastcgi_split_path_info ^(.+\.php)(.*)$;
+                fastcgi_param PATH_INFO $fastcgi_path_info;      
+            
+            
+            
+            #fastcgi_pass   127.0.0.1:9000;
+            #fastcgi_index  index.php;
+	    #fastcgi_param  SCRIPT_FILENAME  /home/webroot/$fastcgi_script_name;
+            #fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+            #include        fastcgi_params;
+             #if (!-f $request_filename){
+             #    rewrite (.*) /index.php;
+             #}
+		
+        }
+
+          location = /redis {
+                internal;
+                set_md5 $redis_key $args;
+                redis_pass redis;
+        }
+ 
+        location = /redis2 {
+                internal;
+ 
+                set_unescape_uri $exptime $arg_exptime;
+                set_unescape_uri $key $arg_key;
+                set_md5 $key;
+ 
+                redis2_query set $key $echo_request_body;
+                redis2_query expire $key $exptime;
+                redis2_pass redis;
+        }
+    }
+
+
+    # HTTPS server
+    #
+    #server {
+    #    listen       443;
+    #    server_name  localhost;
+
+    #    ssl                  on;
+    #    ssl_certificate      cert.pem;
+    #    ssl_certificate_key  cert.key;
+
+    #    ssl_session_timeout  5m;
+
+    #    ssl_protocols  SSLv2 SSLv3 TLSv1;
+    #    ssl_ciphers  HIGH:!aNULL:!MD5;
+    #    ssl_prefer_server_ciphers   on;
+
+    #    location / {
+    #        root   html;
+    #        index  index.html index.htm;
+    #    }
+    #}
+
+}

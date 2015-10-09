@@ -1,0 +1,76 @@
+rpm --nosignature -i http://repo.varnish-cache.org/redhat/varnish-4.0/el6/noarch/varnish-release/varnish-release-4.0-4.el6.noarch.rpm
+yum install varnish -y
+
+/usr/local/varnish/sbin/varnishd -f /usr/local/varnish/etc/varnish/default.vcl -s malloc,1024m -T 127.0.0.1:200 -a 0.0.0.0:80
+
+启动varnishncsa用来将Varnish访问日志写入日志文件：
+
+/usr/local/varnish/bin/varnishncsa -n /var/vcache -w /var/logs/varnish.log &
+
+
+
+配置开机自动启动Varnish
+
+vi /etc/rc.local
+
+　　在末尾增加以下内容：
+
+引用
+ulimit -SHn 51200
+/usr/local/varnish/sbin/varnishd -n /var/vcache -f /usr/local/varnish/vcl.conf -a 0.0.0.0:80 -s file,/var/vcache/varnish_cache.data,1G -g www -u www -w 30000,51200,10 -T 127.0.0.1:3500 -p client_http11=on
+/usr/local/varnish/bin/varnishncsa -n /var/vcache -w /var/logs/youvideo.log &
+
+
+
+　优化Linux内核参数
+
+vi /etc/sysctl.conf
+
+　　在末尾增加以下内容：
+
+引用
+net.ipv4.tcp_fin_timeout = 30
+net.ipv4.tcp_keepalive_time = 300
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_tw_recycle = 1
+net.ipv4.ip_local_port_range = 5000    65000
+
+ 查看Varnish服务器连接数与命中率
+/usr/local/varnish/bin/varnishstat
+
+ 
+
+配置启动脚本： 
+
+mkdir /cache/varnish/V -p
+
+vi /usr/local/varnish/sbin/start.sh
+
+ 
+
+#!/bin/sh
+#file:start.sh
+date -u
+/usr/local/varnish/sbin/varnishd -a 0.0.0.0:80  -s file,/cache/varnish/V,1024m  -f  /usr/local/varnish/etc/varnish/default.vcl  -p thread_pool_max=1500  -p thread_pools=5  -p listen_depth=512 
+
+chmod 777 start.sh
+
+运行：
+
+/usr/local/varnish/sbin/start.sh
+
+
+
+
+
+
+
+
+
+
+==============================
+最终可用命令：
+varnishd -a 0.0.0.0:80 -s file,/varnishcache/varnish_storage.bin,1g  -T 0.0.0.0:6082 -f /etc/varnish/default.vcl -t 900 -p connect_timeout=600 -p thread_pool_min=200 -p thread_pool_max=5000 -p thread_pools=5 -p thread_pool_add_delay=2 -p listen_depth=512 -p http_req_size=131072 -p http_req_hdr_len=49152 
+
+4、查看Varnish内存使用量：varnishstat -1|grep SMA

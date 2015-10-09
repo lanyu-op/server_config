@@ -1,0 +1,15 @@
+mkdir  -p  /home/svnroot/svndata/repos1  
+
+svnadmin create  /home/svnroot/svndata/repos1 
+
+svn checkout svn://112.74.95.143/myshow
+
+svn update /home/webroot/myshow --username suibin --password suibin
+
+svnserve -d -r  /home/svn
+
+linux/unix下svn自动更新出错解决：
+post-commit hook failed (exit code 255) with no output.
+linux/unix下要实现svn提交后自动更新到测试服务器，添加hook即可/usr/svn/mulu/hooks/post-commit 不带后缀
+设置权限为可执行
+chmod 777 /usr/svn/baoming/hooks/post-commit

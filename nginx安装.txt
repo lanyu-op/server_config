@@ -1,0 +1,43 @@
+1,下载pcel
+2,下载zlib
+3,下载ssl
+4,下载lua
+
+./configure --prefix=/usr/local/nginx --with-http_stub_status_module --with-http_ssl_module --with-pcre=/home/pcre-8.32 --with-openssl=/home/openssl-1.0.0a --with-http_gzip_static_module --with-zlib=/home/zlib-1.2.8
+
+openssl出错，查看版本和编译的对不对：
+
+openssl version -a 
+------------------------------------------------
+nginx+redis缓存安装：
+首先安装lua5.1和luajit-2.0.4
+安装lua5前提：
+ yum install glibc* -y
+ yum install glibc-static libstdc++-static
+wget http://www.sfr-fresh.com/unix/misc/readline-6.1.tar.gz 
+wget http://ftp.gnu.org/pub/gnu/ncurses/ncurses-5.7.tar.gz
+先安装以上2个，安装lua命令：make linux
+
+
+包含模块：
+--add-module=../modules/ngx_devel_kit-0.2.18 
+--add-module=../modules/set-misc-nginx-module-0.22rc8 
+--add-module=../modules/srcache-nginx-module-0.22 
+--add-module=../modules/redis-nginx-module-0.3.6 
+--add-module=../modules/redis2-nginx-module-0.10
+lua-nginx-module
+echo-nginx-module
+
+执行：
+./configure --prefix=/usr/local/nginx --conf-path=/usr/local/nginx/conf/nginx.conf --with-http_realip_module --with-http_stub_status_module --with-http_ssl_module --with-pcre=/home/pcre-8.32 --with-http_gzip_static_module --with-zlib=/home/zlib-1.2.8 --add-module=../nginx-modules/ngx_devel_kit --add-module=../nginx-modules/set-misc-nginx-module --add-module=../nginx-modules/srcache-nginx-module --add-module=../nginx-modules/ngx_http_redis --add-module=../nginx-modules/redis2-nginx-module --add-module=../nginx-modules/echo-nginx-module --add-module=../nginx-modules/lua-nginx-module --with-ld-opt="-Wl,-rpath,$LUAJIT_LIB" 
+make && make install
+
+运行报错：
+/usr/local/nginx/sbin/nginx: error while loading shared libraries: libluajit-5.1.so.2: cannot open shared object file: No such file or directory
+ln -s /usr/local/lib/libluajit-5.1.so.2 /lib64/libluajit-5.1.so.2
+
+配置nginx.conf
+-------------------------------------------
+redis-server /home/redis-3.0.2/redis.conf &
+redis-cli shutdown
+-----------------------------------------

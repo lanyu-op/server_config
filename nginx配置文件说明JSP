@@ -1,0 +1,78 @@
+1. 安装Nginx
+
+首先下载 Nginx安装包 ，tar zvxf解压到/usr/local/src目录;
+
+下载模块 ngx_devel_kit , set-misk-nginx-module , srcache-nginx-module , echo-nginx-module , ngx-http-redis , redis2-nginx-module ;
+
+将这些模块解压到/usr/local/src/modules/下面;
+
+进入/usr/local/src/nginx-1.8.0/目录，执行如下命令：
+
+./configure --add-module=../modules/echo-nginx-module-0.57 --add-module=../modules/ngx_http_redis-0.3.7  --add-module=../modules/ngx_devel_kit-0.2.19 --add-module=../modules/set-misc-nginx-module-0.29  --add-module=../modules/srcache-nginx-module-master --add-module=../modules/redis2-nginx-module-master
+然后执行make;make install；
+
+默认安装到/usr/local/nginx/目录中，至此安装成功;
+
+2. 配置Nginx
+
+首先在Http体中声明upstream(这个命令没有研究，只能自己猜测了下),代码如下：
+
+upstream redis{
+    server 127.0.0.1:6379;
+    keepalive 512;
+}
+server 是Redis服务器的IP+PORT，keepalive是保持的连接数，这个连接数是网上的，对于我的项目来说应该是太大了。大家自行修改。
+
+配置Server中的location监听
+
+location /test/ {
+  #这三个命令参考srcache 文档,http://wiki.nginx.org/HttpSRCacheModule
+  srcache_store_private on;
+  srcache_methods GET;
+  srcache_response_cache_control off;
+  #匹配自己的路径，由于Nginx不支持嵌套if，所以这么写
+  if ($uri ~ /test/index\.jsp$){
+    set $flag "${flag}1";
+  }
+  if ($arg_id ~ [0-9]+$){
+    set $flag "${flag}1";
+  }
+  if ($flag = "011"){
+    #这里我用普通的请求参数来作为缓存的键值，网上的是用MD5，但是对于更新缓存又多了操作。大家根据业务自行调整。
+    set $key $arg_id;
+    set_escape_uri $escaped_key $key;
+    #请求过来会先查询这个
+    srcache_fetch GET /redis $key;
+    #过期时间
+    srcache_default_expire 60;
+    srcache_store PUT /redis2 key=$escaped_key&exptime=$srcache_expire;
+    #添加头信息
+    add_header X-Cached-From $srcache_fetch_status;
+    add_header X-Cached-Store $srcache_store_status;
+    add_header X-Key $key;
+    set_md5 $md5key $key;
+    add_header X-md5-key $md5key;
+    add_header X-Query_String $query_string;
+    add_header X-expire $srcache_expire;
+  }
+  #网上都是用fast_cgi来代理，没弄会，就用最初的了，貌似fast_cgi是apache php下用的
+  proxy_pass http://192.168.1.102:8080;
+}
+#redis模块
+location = /redis {
+  internal;
+  set $redis_key $args;
+  redis_pass redis;
+}
+#redis2模块
+location = /redis2 {
+  internal;
+  set_unescape_uri $exptime $arg_exptime;
+  set_unescape_uri $key $arg_key;
+  redis2_query set $key $echo_request_body;
+  redis2_query expire $key $exptime;
+  redis2_pass redis;
+}
+
+
+到这里后，配置就完成了。

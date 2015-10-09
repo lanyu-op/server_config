@@ -1,0 +1,8 @@
+一些基本命令：
+chkconfig --list
+
+svnserve -d -r /home/svn
+redis-server /home/redis-3.0.2/redis.conf &
+/usr/local/php/sbin/php-fpm
+/usr/local/nginx/sbin/nginx
+varnishd -a 0.0.0.0:80 -s file,/varnishcache/varnish_storage.bin,1g  -T 0.0.0.0:6082 -f /etc/varnish/default.vcl -t 900 -p connect_timeout=600 -p thread_pool_min=200 -p thread_pool_max=5000 -p thread_pools=5 -p thread_pool_add_delay=2 -p listen_depth=512 -p http_req_size=131072 -p http_req_hdr_len=49152
